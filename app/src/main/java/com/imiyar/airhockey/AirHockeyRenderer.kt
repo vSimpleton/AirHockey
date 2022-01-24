@@ -21,14 +21,16 @@ class AirHockeyRenderer(private val glSurfaceView: MyGLSurfaceView) : GLSurfaceV
     private val mContext = glSurfaceView.context
     private var mProgram = 0 // 着色器程序
 
-    private var uColorLocation = 0
+    private var aColorLocation = 0
     private var aPositionLocation = 0
 
     companion object {
         private const val POSITION_COMPONENT_COUNT = 2 // 每个顶点有2个分量
+        private const val COLOR_COMPONENT_COUNT = 3 // 每个颜色有3个分量
         private const val BYTES_PER_FLOAT = 4
-        private const val U_COLOR = "u_Color"
+        private const val A_COLOR = "a_Color"
         private const val A_POSITION = "a_Position"
+        private const val STRIDE = (POSITION_COMPONENT_COUNT + COLOR_COMPONENT_COUNT) * BYTES_PER_FLOAT
     }
 
     init {
@@ -40,20 +42,23 @@ class AirHockeyRenderer(private val glSurfaceView: MyGLSurfaceView) : GLSurfaceV
      * FloatBuffer：把内存从Java堆复制到本地堆，从而不受垃圾回收器的管理
      */
     private fun initBuffer() {
+        // 前两个为顶点数据，后三个为颜色RGB数据
         val vertex = floatArrayOf(
-            // Triangles
-            -0.5f, -0.5f,
-            0.5f, -0.5f,
-            -0.5f, 0.5f,
-            0.5f, 0.5f,
+            // Triangle Fan
+            0f, 0f, 1f, 1f, 1f,
+            -0.5f, -0.5f, 0.7f, 0.7f, 0.7f,
+            0.5f, -0.5f, 0.7f, 0.7f, 0.7f,
+            0.5f, 0.5f, 0.7f, 0.7f, 0.7f,
+            -0.5f, 0.5f, 0.7f, 0.7f, 0.7f,
+            -0.5f, -0.5f, 0.7f, 0.7f, 0.7f,
 
             // Line 1
-            -0.5f, 0f,
-            0.5f, 0f,
+            -0.5f, 0f, 1f, 0f, 0f,
+            0.5f, 0f, 1f, 0f, 0f,
 
             // Mallets
-            0f, -0.25f,
-            0f, 0.25f
+            0f, -0.25f, 0f, 0f, 1f,
+            0f, 0.25f, 1f, 0f, 0f,
         )
         mVertexBuffer = BufferHelper.putFloatBuffer(vertex)
     }
@@ -72,15 +77,21 @@ class AirHockeyRenderer(private val glSurfaceView: MyGLSurfaceView) : GLSurfaceV
 
         glUseProgram(mProgram)
 
-        // 获取uniform与attribute的位置
-        uColorLocation = glGetUniformLocation(mProgram, U_COLOR)
+        // 获取attribute变量的索引位置
+        aColorLocation = glGetAttribLocation(mProgram, A_COLOR)
         aPositionLocation = glGetAttribLocation(mProgram, A_POSITION)
 
-        // 关联attribute与顶点数据的数组
+        // 关联aPositionLocation与顶点数据的数组
         mVertexBuffer.position(0)
-        glVertexAttribPointer(aPositionLocation, POSITION_COMPONENT_COUNT, GL_FLOAT, false, 0, mVertexBuffer)
+        glVertexAttribPointer(aPositionLocation, POSITION_COMPONENT_COUNT, GL_FLOAT, false, STRIDE, mVertexBuffer)
         // 使能顶点数据
         glEnableVertexAttribArray(aPositionLocation)
+
+        // 关联aColorLocation与顶点颜色数据的数组
+        mVertexBuffer.position(POSITION_COMPONENT_COUNT)
+        glVertexAttribPointer(aColorLocation, COLOR_COMPONENT_COUNT, GL_FLOAT, false, STRIDE, mVertexBuffer)
+        // 使能顶点颜色数据
+        glEnableVertexAttribArray(aColorLocation)
 
     }
 
@@ -118,18 +129,14 @@ class AirHockeyRenderer(private val glSurfaceView: MyGLSurfaceView) : GLSurfaceV
         glClear(GL_COLOR_BUFFER_BIT)
 
         // 绘制长方形（由两个三角形构成）
-        glUniform4f(uColorLocation, 1f, 1f, 1f, 1f)
-        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
+        glDrawArrays(GL_TRIANGLE_FAN, 0, 6)
 
         // 绘制分割线
-        glUniform4f(uColorLocation, 1f, 0f, 0f, 1f)
-        glDrawArrays(GL_LINES, 4, 2)
+        glDrawArrays(GL_LINES, 6, 2)
 
         // 绘制两个点(一个蓝色，一个红色)
-        glUniform4f(uColorLocation, 0f, 0f, 1f, 1f)
-        glDrawArrays(GL_POINTS, 6, 1)
-        glUniform4f(uColorLocation, 1f, 0f, 0f, 1f)
-        glDrawArrays(GL_POINTS, 7, 1)
+        glDrawArrays(GL_POINTS, 8, 1)
+        glDrawArrays(GL_POINTS, 9, 1)
 
     }
 }
