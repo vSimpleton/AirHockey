@@ -2,6 +2,7 @@ package com.imiyar.airhockey
 
 import android.opengl.GLES20.*
 import android.opengl.GLSurfaceView
+import android.opengl.Matrix
 import com.imiyar.airhockey.utils.BufferHelper
 import com.imiyar.airhockey.utils.ResourceReaderHelper
 import com.imiyar.airhockey.utils.ShaderHelper
@@ -23,6 +24,8 @@ class AirHockeyRenderer(private val glSurfaceView: MyGLSurfaceView) : GLSurfaceV
 
     private var aColorLocation = 0
     private var aPositionLocation = 0
+    private var uMatrixLocation = 0
+    private var mProjectionMatrix = FloatArray(16)
 
     companion object {
         private const val POSITION_COMPONENT_COUNT = 2 // 每个顶点有2个分量
@@ -30,6 +33,7 @@ class AirHockeyRenderer(private val glSurfaceView: MyGLSurfaceView) : GLSurfaceV
         private const val BYTES_PER_FLOAT = 4
         private const val A_COLOR = "a_Color"
         private const val A_POSITION = "a_Position"
+        private const val U_MATRIX = "u_Matrix"
         private const val STRIDE = (POSITION_COMPONENT_COUNT + COLOR_COMPONENT_COUNT) * BYTES_PER_FLOAT
     }
 
@@ -46,19 +50,19 @@ class AirHockeyRenderer(private val glSurfaceView: MyGLSurfaceView) : GLSurfaceV
         val vertex = floatArrayOf(
             // Triangle Fan
             0f, 0f, 1f, 1f, 1f,
-            -0.5f, -0.5f, 0.7f, 0.7f, 0.7f,
-            0.5f, -0.5f, 0.7f, 0.7f, 0.7f,
-            0.5f, 0.5f, 0.7f, 0.7f, 0.7f,
-            -0.5f, 0.5f, 0.7f, 0.7f, 0.7f,
-            -0.5f, -0.5f, 0.7f, 0.7f, 0.7f,
+            -0.5f, -0.8f, 0.7f, 0.7f, 0.7f,
+            0.5f, -0.8f, 0.7f, 0.7f, 0.7f,
+            0.5f, 0.8f, 0.7f, 0.7f, 0.7f,
+            -0.5f, 0.8f, 0.7f, 0.7f, 0.7f,
+            -0.5f, -0.8f, 0.7f, 0.7f, 0.7f,
 
             // Line 1
             -0.5f, 0f, 1f, 0f, 0f,
             0.5f, 0f, 1f, 0f, 0f,
 
             // Mallets
-            0f, -0.25f, 0f, 0f, 1f,
-            0f, 0.25f, 1f, 0f, 0f,
+            0f, -0.4f, 0f, 0f, 1f,
+            0f, 0.4f, 1f, 0f, 0f,
         )
         mVertexBuffer = BufferHelper.putFloatBuffer(vertex)
     }
@@ -73,13 +77,19 @@ class AirHockeyRenderer(private val glSurfaceView: MyGLSurfaceView) : GLSurfaceV
         glClearColor(0f, 0f, 0f, 0f)
 
         // 初始化着色器与链接程序
-        initShaderAndProgram()
+        val vertexStr = ResourceReaderHelper.readTextFileFromResource(mContext, R.raw.vertex_shader)
+        val fragmentStr = ResourceReaderHelper.readTextFileFromResource(mContext, R.raw.fragment_shader)
+        val vShaderId = ShaderHelper.compileVertexShader(vertexStr)
+        val fShaderId = ShaderHelper.compileFragmentShader(fragmentStr)
+        mProgram = ShaderHelper.linkProgram(vShaderId, fShaderId)
 
+        // 使用程序
         glUseProgram(mProgram)
 
-        // 获取attribute变量的索引位置
+        // 获取uniform与attribute变量的索引位置
         aColorLocation = glGetAttribLocation(mProgram, A_COLOR)
         aPositionLocation = glGetAttribLocation(mProgram, A_POSITION)
+        uMatrixLocation = glGetUniformLocation(mProgram, U_MATRIX)
 
         // 关联aPositionLocation与顶点数据的数组
         mVertexBuffer.position(0)
@@ -96,19 +106,6 @@ class AirHockeyRenderer(private val glSurfaceView: MyGLSurfaceView) : GLSurfaceV
     }
 
     /**
-     * 初始化着色器与链接程序
-     */
-    private fun initShaderAndProgram() {
-        val vertexStr = ResourceReaderHelper.readTextFileFromResource(mContext, R.raw.vertex_shader)
-        val fragmentStr = ResourceReaderHelper.readTextFileFromResource(mContext, R.raw.fragment_shader)
-
-        val vShaderId = ShaderHelper.compileVertexShader(vertexStr)
-        val fShaderId = ShaderHelper.compileFragmentShader(fragmentStr)
-
-        mProgram = ShaderHelper.linkProgram(vShaderId, fShaderId)
-    }
-
-    /**
      * 当Surface尺寸改变时，此方法会被调用
      *
      * 如横屏、竖屏来回切换
@@ -116,6 +113,14 @@ class AirHockeyRenderer(private val glSurfaceView: MyGLSurfaceView) : GLSurfaceV
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
         // 设置视窗的尺寸大小
         glViewport(0, 0, width, height)
+
+        // 创建正交投影矩阵，适配横竖屏切换
+        val aspectRatio = (if (width > height) width / height else height / width).toFloat()
+        if (width > height) {
+            Matrix.orthoM(mProjectionMatrix, 0, -aspectRatio, aspectRatio, -1f, 1f, -1f, 1f)
+        } else {
+            Matrix.orthoM(mProjectionMatrix, 0, -1f, 1f, -aspectRatio, aspectRatio, -1f, 1f)
+        }
     }
 
     /**
@@ -127,6 +132,7 @@ class AirHockeyRenderer(private val glSurfaceView: MyGLSurfaceView) : GLSurfaceV
     override fun onDrawFrame(gl: GL10?) {
         // 清屏
         glClear(GL_COLOR_BUFFER_BIT)
+        glUniformMatrix4fv(uMatrixLocation, 1, false, mProjectionMatrix, 0)
 
         // 绘制长方形（由两个三角形构成）
         glDrawArrays(GL_TRIANGLE_FAN, 0, 6)
