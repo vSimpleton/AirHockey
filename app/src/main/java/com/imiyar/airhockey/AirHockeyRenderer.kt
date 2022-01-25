@@ -4,6 +4,7 @@ import android.opengl.GLES20.*
 import android.opengl.GLSurfaceView
 import android.opengl.Matrix
 import com.imiyar.airhockey.utils.BufferHelper
+import com.imiyar.airhockey.utils.MatrixHelper
 import com.imiyar.airhockey.utils.ResourceReaderHelper
 import com.imiyar.airhockey.utils.ShaderHelper
 import java.nio.FloatBuffer
@@ -16,7 +17,7 @@ import javax.microedition.khronos.opengles.GL10
  * DESC: 自定义渲染器
  */
 
-class AirHockeyRenderer(private val glSurfaceView: MyGLSurfaceView) : GLSurfaceView.Renderer {
+class AirHockeyRenderer(glSurfaceView: MyGLSurfaceView) : GLSurfaceView.Renderer {
 
     private lateinit var mVertexBuffer: FloatBuffer // 顶点坐标数据缓冲区
     private val mContext = glSurfaceView.context
@@ -25,7 +26,9 @@ class AirHockeyRenderer(private val glSurfaceView: MyGLSurfaceView) : GLSurfaceV
     private var aColorLocation = 0
     private var aPositionLocation = 0
     private var uMatrixLocation = 0
-    private var mProjectionMatrix = FloatArray(16)
+
+    private var mProjectionMatrix = FloatArray(16) // 正交投影矩阵（归一化设备坐标）
+    private var mModelMatrix = FloatArray(16) // 模型矩阵（移动物体）
 
     companion object {
         private const val POSITION_COMPONENT_COUNT = 2 // 每个顶点有2个分量
@@ -49,20 +52,20 @@ class AirHockeyRenderer(private val glSurfaceView: MyGLSurfaceView) : GLSurfaceV
         // 前两个为顶点数据，后三个为颜色RGB数据
         val vertex = floatArrayOf(
             // Triangle Fan
-            0f, 0f, 1f, 1f, 1f,
+               0f,    0f,   1f,   1f,   1f,
             -0.5f, -0.8f, 0.7f, 0.7f, 0.7f,
-            0.5f, -0.8f, 0.7f, 0.7f, 0.7f,
-            0.5f, 0.8f, 0.7f, 0.7f, 0.7f,
-            -0.5f, 0.8f, 0.7f, 0.7f, 0.7f,
+             0.5f, -0.8f, 0.7f, 0.7f, 0.7f,
+             0.5f,  0.8f, 0.7f, 0.7f, 0.7f,
+            -0.5f,  0.8f, 0.7f, 0.7f, 0.7f,
             -0.5f, -0.8f, 0.7f, 0.7f, 0.7f,
 
             // Line 1
             -0.5f, 0f, 1f, 0f, 0f,
-            0.5f, 0f, 1f, 0f, 0f,
+             0.5f, 0f, 1f, 0f, 0f,
 
             // Mallets
             0f, -0.4f, 0f, 0f, 1f,
-            0f, 0.4f, 1f, 0f, 0f,
+            0f,  0.4f, 1f, 0f, 0f,
         )
         mVertexBuffer = BufferHelper.putFloatBuffer(vertex)
     }
@@ -115,12 +118,26 @@ class AirHockeyRenderer(private val glSurfaceView: MyGLSurfaceView) : GLSurfaceV
         glViewport(0, 0, width, height)
 
         // 创建正交投影矩阵，适配横竖屏切换
-        val aspectRatio = (if (width > height) width / height else height / width).toFloat()
-        if (width > height) {
-            Matrix.orthoM(mProjectionMatrix, 0, -aspectRatio, aspectRatio, -1f, 1f, -1f, 1f)
-        } else {
-            Matrix.orthoM(mProjectionMatrix, 0, -1f, 1f, -aspectRatio, aspectRatio, -1f, 1f)
-        }
+        // 调整显示区域的宽高使之变换为归一化设备坐标
+//        val aspectRatio = (if (width > height) width / height else height / width).toFloat()
+//        if (width > height) {
+//            Matrix.orthoM(mProjectionMatrix, 0, -aspectRatio, aspectRatio, -1f, 1f, -1f, 1f)
+//        } else {
+//            Matrix.orthoM(mProjectionMatrix, 0, -1f, 1f, -aspectRatio, aspectRatio, -1f, 1f)
+//        }
+
+        // 使用透视投影矩阵
+        MatrixHelper.perspectiveM(mProjectionMatrix, 45f, width.toFloat() / height.toFloat(), 1f, 10f)
+        // 把模型矩阵设为单位矩阵，并沿着z轴负方向移动2个单位
+        Matrix.setIdentityM(mModelMatrix, 0)
+        Matrix.translateM(mModelMatrix, 0, 0f, 0f, -3.5f)
+        Matrix.rotateM(mModelMatrix, 0, -60f, 1f, 0f, 0f)
+
+        // 正交投影矩阵与模型矩阵相乘，最后把相乘的结果copy到正交投影矩阵中
+        val tempArray = FloatArray(16)
+        Matrix.multiplyMM(tempArray, 0, mProjectionMatrix, 0, mModelMatrix, 0)
+        System.arraycopy(tempArray, 0, mProjectionMatrix, 0, tempArray.size)
+
     }
 
     /**
@@ -132,6 +149,7 @@ class AirHockeyRenderer(private val glSurfaceView: MyGLSurfaceView) : GLSurfaceV
     override fun onDrawFrame(gl: GL10?) {
         // 清屏
         glClear(GL_COLOR_BUFFER_BIT)
+        // 把矩阵数据传递给着色器
         glUniformMatrix4fv(uMatrixLocation, 1, false, mProjectionMatrix, 0)
 
         // 绘制长方形（由两个三角形构成）
