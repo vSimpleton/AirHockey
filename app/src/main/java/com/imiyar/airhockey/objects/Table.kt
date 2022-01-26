@@ -1,6 +1,7 @@
-package com.imiyar.airhockey.data
+package com.imiyar.airhockey.objects
 
 import android.opengl.GLES20
+import com.imiyar.airhockey.data.VertexArray
 import com.imiyar.airhockey.program.TextureShaderProgram
 import com.imiyar.airhockey.utils.BYTES_PER_FLOAT
 

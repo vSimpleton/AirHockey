@@ -13,26 +13,23 @@ import com.imiyar.airhockey.R
 class ColorShaderProgram(context: Context) : ShaderProgram(context, R.raw.vertex_shader, R.raw.fragment_shader) {
 
     private var uMatrixLocation = 0
+    private var uColorLocation = 0
 
     private var aPositionLocation = 0
-    private var aColorLocation = 0
 
     init {
         uMatrixLocation = glGetUniformLocation(mProgram, U_MATRIX)
         aPositionLocation = glGetAttribLocation(mProgram, A_POSITION)
-        aColorLocation = glGetAttribLocation(mProgram, A_COLOR)
+        uColorLocation = glGetUniformLocation(mProgram, U_COLOR)
     }
 
-    fun setUniforms(matrix: FloatArray) {
+    fun setUniforms(matrix: FloatArray, r: Float, g: Float, b: Float) {
         glUniformMatrix4fv(uMatrixLocation, 1, false, matrix, 0)
+        glUniform4f(uColorLocation, r, g, b, 1f)
     }
 
     fun getPositionAttributeLocation(): Int {
         return aPositionLocation
-    }
-
-    fun getColorAttributeLocation(): Int {
-        return aColorLocation
     }
 
 }

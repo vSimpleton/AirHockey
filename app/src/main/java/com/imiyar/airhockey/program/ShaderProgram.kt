@@ -20,6 +20,7 @@ open class ShaderProgram(context: Context, vertexShaderResourceId: Int, fragment
 
         const val U_MATRIX = "u_Matrix"
         const val U_TEXTURE_UNIT = "u_TextureUnit"
+        const val U_COLOR = "u_Color"
     }
 
     protected var mProgram = 0
