@@ -76,6 +76,18 @@ object ShaderHelper {
     }
 
     /**
+     * 编译着色器，并链接为着色器程序
+     */
+    fun buildProgram(vertexStr: String, fragmentStr: String): Int {
+        val program: Int
+        val vShaderId = compileVertexShader(vertexStr)
+        val fShaderId = compileFragmentShader(fragmentStr)
+        program = linkProgram(vShaderId, fShaderId)
+
+        return program
+    }
+
+    /**
      * 验证程序是否可用
      */
     fun validateProgram(programId: Int): Boolean {
